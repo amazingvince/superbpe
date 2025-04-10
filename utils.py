@@ -40,20 +40,17 @@ def train_or_extend_tokenizer(
 
     pretokenizers = [
         Digits(individual_digits=False),
+        Split(
+            pattern=Regex(regex_string),
+            behavior="isolated",
+            invert=False,
+        ),
         ByteLevel(
             add_prefix_space=False,
             trim_offsets=True,
             use_regex=False,
         ),
     ]
-    if regex_string:
-        pretokenizers.append(
-            Split(
-                pattern=Regex(regex_string),
-                behavior="isolated",
-                invert=False,
-            )
-        )
     tokenizer.pre_tokenizer = pre_tokenizers.Sequence(pretokenizers)
 
     tokenizer.train(text_files, trainer)
