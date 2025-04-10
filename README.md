@@ -11,6 +11,8 @@ This repository contains the tokenizer training code. Code for other aspects of 
 Our tokenizer training data is available [here](https://huggingface.co/datasets/UW/olmo-mix-1124-subset-p99). You can download it with the following command (after installing [`huggingface-cli`](https://huggingface.co/docs/huggingface_hub/en/guides/cli) and logging into your HuggingFace account).
 
 ```
+mkdir olmo-mix-1124-subset-p99
+cd olmo-mix-1124-subset-p99
 huggingface-cli download UW/olmo-mix-1124-subset-p99 --repo-type dataset --local-dir .
 ```
 
