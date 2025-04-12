@@ -4,12 +4,35 @@
 
 This repository contains the tokenizer training code. Code for other aspects of the project (e.g. evals, model scaling, data processing, wandb, train configs) will be added soon!
 
-## Install `tokenizers` fork
-**Important note:** Our project depends on a custom [fork](https://github.com/alisawuffles/tokenizers-superbpe) of [huggingface/tokenizers](https://github.com/huggingface/tokenizers) which conflicts with the original. You can follow the installation instructions [here](https://github.com/alisawuffles/tokenizers-superbpe/tree/757f2a55c0820ed47064e1fe473deea39b7b611b/bindings/python). Because of this, we recommend *always installing this project in its own virtual environment.*
+## Setup
+First, clone the project with:
+```bash
+git clone --recurse-submodules https://github.com/PythonNut/superbpe.git
+```
+We use a custom [fork](https://github.com/alisawuffles/tokenizers-superbpe) of [huggingface/tokenizers](https://github.com/huggingface/tokenizers) which conflicts with the original.
+Because of this, we recommend *always installing this project in its own virtual environment.*
 
-## Data download
-Our tokenizer training data is available [here](https://huggingface.co/datasets/UW/olmo-mix-1124-subset-p99). You can download it with the following command (after installing [`huggingface-cli`](https://huggingface.co/docs/huggingface_hub/en/guides/cli) and logging into your HuggingFace account).
+### Setup virtual environment
 
+#### Using `conda`
+```bash
+conda create -n superbpe python=3.12 rust
+conda activate superbpe
+pip install -r requirements.txt
+```
+
+#### Using `venv`
+You will need to [install rust](https://www.rust-lang.org/tools/install) and Python 3.12.
+Then, you can do:
+```
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Data download
+Our tokenizer training data is available [here](https://huggingface.co/datasets/UW/olmo-mix-1124-subset-p99).
+You can download it using [`huggingface-cli`](https://huggingface.co/docs/huggingface_hub/en/guides/cli) (after logging into your HuggingFace account) using:
 ```
 mkdir olmo-mix-1124-subset-p99
 cd olmo-mix-1124-subset-p99
