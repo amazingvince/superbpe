@@ -6,4 +6,4 @@ filelock
 pysimdjson; python_version >= "3.9" and python_version < "3.13"
 
 # Editable install for tokenizer
--e tokenizers/bindings/python/
+-e tokenizers_superbpe/bindings/python/
