@@ -73,3 +73,14 @@ python -m train_tokenizer \
     --vocab_size 200000 \
     --do_whitespace_pretokenization false
 ```
+
+After tokenizer training, you need to update the `decoder` field in the `tokenizer.json` to make sure it looks like this.
+
+```
+"decoder": {
+    "type": "ByteLevel",
+    "add_prefix_space": true,
+    "trim_offsets": true,
+    "use_regex": true
+}
+```
