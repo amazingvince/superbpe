@@ -7,11 +7,11 @@ from filelock import FileLock
 
 import simdjson as json
 from tqdm import tqdm
-from tokenizers.models import BPE
+from tokenizers.models import BPE, Unigram
 
 from tokenizers import Tokenizer, pre_tokenizers, Regex
 from tokenizers.pre_tokenizers import ByteLevel, Split, Digits
-from tokenizers.trainers import BpeTrainer
+from tokenizers.trainers import BpeTrainer, UnigramTrainer
 
 
 def ensure_dir(d):
@@ -23,20 +23,49 @@ def read_json(file):
     return json.load(open(file))
 
 
+def read_merges_txt(path_to_txt):
+    with open(path_to_txt) as fin:
+        merges = fin.readlines()[1:]
+        merges = [m.rsplit("\n", 1)[0] for m in merges]
+    return merges
+
+
+def get_pretokenization_regex(tokenizer_json):
+    if isinstance(tokenizer_json, str):
+        tokenizer_json = read_json(tokenizer_json)
+
+    split_pretokenizer = [
+        p
+        for p in tokenizer_json["pre_tokenizer"]["pretokenizers"]
+        if p["type"] == "Split"
+    ][0]
+    pretok_regex = split_pretokenizer["pattern"]["Regex"]
+    return pretok_regex
+
+
 def train_or_extend_tokenizer(
     text_files: str,
     vocab_size: int = 100000,
     do_whitespace_pretokenization: bool = True,
+    regex_string: str = None,
+    tokenizer_type: str = "bpe",
 ):
-    tokenizer = Tokenizer(BPE())
-    trainer = BpeTrainer(show_progress=True, vocab_size=vocab_size)
+    if tokenizer_type == "bpe":
+        tokenizer = Tokenizer(BPE())
+        trainer = BpeTrainer(show_progress=True, vocab_size=vocab_size)
+    elif tokenizer_type == "unigram":
+        tokenizer = Tokenizer(Unigram())
+        trainer = UnigramTrainer(show_progress=True, vocab_size=vocab_size)
 
-    regex_string = "(?=(\d{3})+(?!\d))"  # pretokenize digits in groups of 3 from right to left (from Luca)
+    if not regex_string:
+        regex_string = "(?=(\d{3})+(?!\d))"  # pretokenize digits in groups of 3 from right to left (from Luca)
 
-    if do_whitespace_pretokenization:
-        regex_string += (
-            "| ?\p{L}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"  # GPT-2 pretokenization
-        )
+        if do_whitespace_pretokenization:
+            if regex_string:
+                regex_string += "|"
+            regex_string += (
+                " ?\p{L}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"  # GPT-2 pretokenization
+            )
 
     pretokenizers = [
         Digits(individual_digits=False),
@@ -52,7 +81,6 @@ def train_or_extend_tokenizer(
         ),
     ]
     tokenizer.pre_tokenizer = pre_tokenizers.Sequence(pretokenizers)
-
     tokenizer.train(text_files, trainer)
 
     return tokenizer
@@ -143,6 +171,7 @@ def get_files_with_num_bytes(data_dir, num_bytes=None, loop_around=True):
 
     if not num_bytes:  # if num_bytes is not specified, use all text data
         file_list = [str(data_dir / f) for f in all_files]
+        byte_count = sum(os.path.getsize(data_dir / f) for f in all_files)
         print(f"Using all {len(file_list)} files in {data_dir}")
     else:
         random.shuffle(all_files)
