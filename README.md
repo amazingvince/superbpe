@@ -84,3 +84,17 @@ After tokenizer training, you need to update the `decoder` field in the `tokeniz
     "use_regex": true
 }
 ```
+
+## Citation 
+
+If you found this codebase helpful, please cite
+
+```
+@article{liu2025superbpe,
+  title={{SuperBPE}: Space travel for language models},
+  author={Alisa Liu and Jonathan Hayase and Valentin Hofmann and Sewoong Oh and Noah A Smith and Yejin Choi},
+  journal={arXiv preprint arXiv:2503.13423},
+  year={2025},
+  url={https://arxiv.org/abs/2503.13423}
+}
+```
