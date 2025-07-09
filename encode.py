@@ -1,5 +1,5 @@
 """
-Calculate encoding efficiency over a corpus of text.
+Calculate encoding efficiency (in bytes per token) over a corpus of text.
 """
 
 import json
@@ -89,11 +89,19 @@ def main(
     # if vocab_size is given, construct tokenizer with the desired vocab_size
     if vocab_size and vocab_size <= tokenizer.get_vocab_size():
         print(f"We will only use the top {vocab_size} merges for encoding.", flush=True)
-        merges = tokenizer_json["model"]["merges"]
-        tokenizer_json["model"]["merges"] = merges[:vocab_size]
-        tokenizer_json["model"]["ignore_merges"] = False
+        if tokenizer_json["model"]["type"] == "BPE":
+            merges = tokenizer_json["model"]["merges"]
+            tokenizer_json["model"]["merges"] = merges[:vocab_size]
+            tokenizer_json["model"]["ignore_merges"] = False
+        elif tokenizer_json["model"]["type"] == "WordPiece":
+            vocab = tokenizer_json["model"]["vocab"]
+            tokenizer_json["model"]["vocab"] = dict(list(vocab.items())[:vocab_size])
+        else:
+            raise ValueError(
+                f"Tokenizer type {tokenizer_json['model']['type']} not supported"
+            )
 
-        # create new tokenizer file with truncated vocabulary (hacky)
+        # create temporary new tokenizer file with truncated vocabulary
         tokenizer_path = tokenizer_path.replace(
             "tokenizer.json", f"tokenizer_{vocab_size}.json"
         )
@@ -115,7 +123,9 @@ def main(
         print(f"Setting dropout to {dropout}", flush=True)
         tokenizer.model.dropout = dropout
 
-    pretok_regex = get_pretokenization_regex(tokenizer_json)
+    if count_pretokens:
+        pretok_regex = get_pretokenization_regex(tokenizer_json)
+        print(f"Using pretokenization regex: {pretok_regex}", flush=True)
 
     def encode_file(file, count_pretokens=False):
         """
@@ -127,21 +137,22 @@ def main(
         # Split into chunks so we don't OOM
         # This is ok bc tokenizer training splits on newline
         tokens = []
-        num_pretokens = 0
         pps = text.split("\n\n")
         chunk_size = max(len(pps) // 20, 100)
         for i in tqdm(range(0, len(pps), chunk_size), desc=os.path.basename(file)):
             chunk = "\n\n".join(pps[i : i + chunk_size]) + "\n\n"
             encoded = tokenizer.encode(chunk)
             tokens.extend(encoded.ids)
-            if count_pretokens:
-                num_pretokens += len(
-                    [match for match in re.finditer(pretok_regex, text)]
-                )
             # Note to self: num_pretokens will not be completely accurate for superword tokenizers because
             # the tokenizers training library splits on newline (separately from pretokenization). However,
             # the upper bound calculation is mainly for pretok tokenizers anyway, so we won't worry too
             # much about this case.
+
+        num_pretokens = (
+            len([m.group() for m in re.finditer(pretok_regex, text)])
+            if count_pretokens
+            else None
+        )
 
         return tokens, num_pretokens
 
@@ -164,7 +175,8 @@ def main(
     for file in file_list:
         tokens, num_pretokens = encode_file(file, count_pretokens=count_pretokens)
         token_count += len(tokens)
-        pretoken_count += num_pretokens
+        if count_pretokens:
+            pretoken_count += num_pretokens
         if save_token_stats:
             filename = os.path.basename(file).split(".txt")[0]
             ensure_dir(f"encoded/{tokenizer_name}")
