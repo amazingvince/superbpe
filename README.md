@@ -90,10 +90,10 @@ After tokenizer training, you need to update the `decoder` field in the `tokeniz
 If you found this codebase helpful, please cite
 
 ```
-@article{liu2025superbpe,
+@inproceedings{liu-etal-2025-superbpe,
   title={{SuperBPE}: Space travel for language models},
   author={Alisa Liu and Jonathan Hayase and Valentin Hofmann and Sewoong Oh and Noah A Smith and Yejin Choi},
-  journal={arXiv preprint arXiv:2503.13423},
+  booktitle={Second Conference on Language Modeling},
   year={2025},
   url={https://arxiv.org/abs/2503.13423}
 }
