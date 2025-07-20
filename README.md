@@ -30,7 +30,9 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Data download
+### Data options
+
+#### Option 1: Download training data
 Our tokenizer training data is available [here](https://huggingface.co/datasets/UW/olmo-mix-1124-subset-p99).
 You can download it using [`huggingface-cli`](https://huggingface.co/docs/huggingface_hub/en/guides/cli) (after logging into your HuggingFace account) using:
 ```
@@ -39,8 +41,22 @@ cd olmo-mix-1124-subset-p99
 huggingface-cli download UW/olmo-mix-1124-subset-p99 --repo-type dataset --local-dir .
 ```
 
+#### Option 2: Stream from Hugging Face datasets
+You can now train tokenizers directly on any Hugging Face dataset without downloading it first. The data will be streamed during training:
+```bash
+python -m train_tokenizer \
+    --output_dir tokenizers/my_tokenizer \
+    --hf_dataset "EleutherAI/SmolLM2-1.7B-stage-4-100B" \
+    --text_column "text" \
+    --num_bytes $((10**10)) \
+    --vocab_size 200000 \
+    --do_whitespace_pretokenization true
+```
+
 ## Tokenizer training
 Training a SuperBPE tokenizer involves two stages:
+
+### Using local files
 
 1. **Stage 1:** Learn subwords by enforcing whitespace pretokenization (equivalent to regular BPE training).
 
@@ -73,6 +89,45 @@ python -m train_tokenizer \
     --vocab_size 200000 \
     --do_whitespace_pretokenization false
 ```
+
+### Using Hugging Face datasets
+
+You can also train directly on Hugging Face datasets without downloading them first:
+
+1. **Stage 1:** Learn subwords with whitespace pretokenization
+
+```bash
+python -m train_tokenizer \
+    --output_dir tokenizers/smollm2_bpe \
+    --hf_dataset "EleutherAI/SmolLM2-1.7B-stage-4-100B" \
+    --text_column "text" \
+    --num_bytes $((10**10)) \
+    --vocab_size 200000 \
+    --do_whitespace_pretokenization true
+```
+
+2. **Stage 2:** Learn superwords without whitespace pretokenization
+
+```bash
+orig_tokenizer_dir=tokenizers/smollm2_bpe
+num_inherit_merges=180000
+output_dir=tokenizers/smollm2_superbpe
+
+mkdir -p $output_dir
+
+# inherit the first num_inherit_merges from the BPE tokenizer
+head -n $num_inherit_merges $orig_tokenizer_dir/merges.txt > $output_dir/merges.txt
+
+# copy metadata (the script will automatically detect it's a HF dataset)
+cp $orig_tokenizer_dir/meta.json $output_dir/meta.json
+
+python -m train_tokenizer \
+    --output_dir $output_dir \
+    --vocab_size 200000 \
+    --do_whitespace_pretokenization false
+```
+
+The training script automatically detects the dataset type from the metadata and will stream the same Hugging Face dataset for stage 2.
 
 After tokenizer training, you need to update the `decoder` field in the `tokenizer.json` to make sure it looks like this.
 

@@ -6,6 +6,7 @@ filelock
 huggingface-hub
 pysimdjson; python_version >= "3.9" and python_version < "3.13"
 ai2-olmo
+datasets
 
 # Editable install for tokenizer
 -e tokenizers_superbpe/bindings/python/

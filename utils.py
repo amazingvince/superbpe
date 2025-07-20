@@ -4,6 +4,7 @@ import os
 import random
 from pathlib import Path
 from filelock import FileLock
+from typing import Union, Optional, Iterator, List
 
 import simdjson as json
 from tqdm import tqdm
@@ -12,6 +13,7 @@ from tokenizers.models import BPE, Unigram
 from tokenizers import Tokenizer, pre_tokenizers, Regex
 from tokenizers.pre_tokenizers import ByteLevel, Split, Digits
 from tokenizers.trainers import BpeTrainer, UnigramTrainer
+from datasets import load_dataset, IterableDataset
 
 
 def ensure_dir(d):
@@ -44,7 +46,7 @@ def get_pretokenization_regex(tokenizer_json):
 
 
 def train_or_extend_tokenizer(
-    text_files: str,
+    text_files: Union[str, List[str], Iterator[str]],
     vocab_size: int = 100000,
     do_whitespace_pretokenization: bool = True,
     regex_string: str = None,
@@ -81,7 +83,14 @@ def train_or_extend_tokenizer(
         ),
     ]
     tokenizer.pre_tokenizer = pre_tokenizers.Sequence(pretokenizers)
-    tokenizer.train(text_files, trainer)
+    
+    # Handle different input types
+    if isinstance(text_files, (str, list)):
+        # Traditional file-based training
+        tokenizer.train(text_files, trainer)
+    else:
+        # Iterator-based training (for streaming datasets)
+        tokenizer.train_from_iterator(text_files, trainer)
 
     return tokenizer
 
@@ -196,3 +205,75 @@ def get_files_with_num_bytes(data_dir, num_bytes=None, loop_around=True):
             if not loop_around and counter >= len(all_files):
                 break
     return file_list, byte_count
+
+
+def get_hf_dataset_iterator(
+    dataset_name: str,
+    num_bytes: Optional[int] = None,
+    text_column: str = "text",
+    split: str = "train",
+    streaming: bool = True,
+    batch_size: int = 1000,
+) -> Iterator[str]:
+    """
+    Create an iterator over text from a Hugging Face dataset.
+    
+    Args:
+        dataset_name: Name of the dataset on Hugging Face
+        num_bytes: Maximum number of bytes to process (None for all)
+        text_column: Column name containing text data
+        split: Dataset split to use
+        streaming: Whether to use streaming mode
+        batch_size: Number of examples to yield at once
+    
+    Yields:
+        Text strings from the dataset
+    """
+    print(f"Loading dataset: {dataset_name}")
+    
+    # Load the dataset
+    dataset = load_dataset(dataset_name, split=split, streaming=streaming)
+    
+    total_bytes = 0
+    batch = []
+    
+    # Create progress bar if num_bytes is specified
+    pbar = tqdm(total=num_bytes, desc="Processing dataset", unit="B", unit_scale=True) if num_bytes else None
+    
+    try:
+        for example in dataset:
+            # Get text from the example
+            text = example.get(text_column, "")
+            if not text:
+                continue
+            
+            # Track bytes
+            text_bytes = len(text.encode("utf-8"))
+            
+            # Check byte limit
+            if num_bytes and total_bytes + text_bytes > num_bytes:
+                # Yield any remaining batch
+                if batch:
+                    yield from batch
+                break
+            
+            batch.append(text)
+            total_bytes += text_bytes
+            
+            if pbar:
+                pbar.update(text_bytes)
+            
+            # Yield batch when it's full
+            if len(batch) >= batch_size:
+                yield from batch
+                batch = []
+        
+        # Yield any remaining texts
+        if batch:
+            yield from batch
+    
+    finally:
+        if pbar:
+            pbar.close()
+    
+    print(f"Processed {total_bytes:,} bytes from dataset")
